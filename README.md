@@ -134,7 +134,7 @@ def expensive_function(arg1, arg2):
 
 # Apply the cache_method decorator to a class method
 class MyClass:
-    @cache_method(cache, "method_cache_key")
+    @cache_result(cache, "method_cache_key")
     def expensive_method(self, arg1, arg2):
         # Perform expensive computation
         return result
