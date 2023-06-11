@@ -109,8 +109,6 @@ large_data_1 = function_that_returns_large_data()  # This entry exceeds the seri
 
 cache.add("large_data_1", large_data_1)
 
-# The large data entry will be automatically serialized when it is added to the cache
-
 # Retrieve the large data entry from the cache, it will be deserialized automatically
 retrieved_data = cache.get("large_data_1")
 ```
