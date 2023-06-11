@@ -14,11 +14,11 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 
 ## WIP
 - Create argument-bound identifiers for caching using decorators
-- Create a more simple way to update cached data
+- Create a more simple way to update cached data when using decorators
 
 ## Dependencies
 
-All dependencies are inbuild Python modules as following:
+All dependencies are inbuild Python modules, icluding following:
 
 - **collections.OrderedDict**: Used for maintaining the cache entries in insertion order.
 - **collections.defaultdict**: Used for tracking the frequency of cache entries in LFU mode.
@@ -51,11 +51,11 @@ small_data_1 = [_ for _ in range(10)]
 small_data_2 = [_ for _ in range(10, 20)]
 
 cache.add("small_data_1", small_data_1)
-cache["small_data_2] = small_data_2
-
+cache["small_data_2"] = small_data_2
 
 # Retrieve an entry from the cache
-value = cache.get("small_data_1")
+data_1 = cache.get("small_data_1")
+data_2 = cache["small_data_2"]
 
 # Update an entry in the cache
 small_data_1_reprocessed = list(range(10))
