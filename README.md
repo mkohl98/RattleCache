@@ -12,6 +12,10 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 - Get an overview of all identifiers in the cache and their corresponding data size.
 - Calculate the memory usage and usage percentage of the cache.
 
+## WIP
+- Create argument-bound identifiers for caching using decorators
+- Create a more simple way to update cached data
+
 ## Dependencies
 
 All dependencies are inbuild Python modules as following:
