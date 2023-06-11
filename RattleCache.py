@@ -293,7 +293,7 @@ class Cache:
 
 ### Decorator Functions
 
-def cache_result(cache: Cache, identifier: str, *args_cache, **kwargs_cache):
+def cached(cache: Cache, identifier: str, *args_cache, **kwargs_cache):
     """
     Decorator that caches the result of a function or method call using the provided cache.
 
@@ -321,7 +321,44 @@ def cache_result(cache: Cache, identifier: str, *args_cache, **kwargs_cache):
     return decorator
 
 
-def cache_with_dependency(cache: Cache, dependency_func, *args_cache, **kwargs_cache):
+def cached_parameter(cache, *args_cache, **kwargs_cache):
+    """
+    Decorator that caches the result of a function or method call using the provided cache. This function generate the
+    identifier by itself using the provided arguments. This means its data is not accessible using Cache
+    methods which requires identifiers as arguments. This means this decorator is very niche but usefull if you don't
+    want to manage the cached data manually.
+
+    Args:
+        cache (Cache): An instance of the Cache class to store the cached results.
+        *args_cache: Additional arguments to pass to the cache's add method.
+        **kwargs_cache: Additional keyword arguments to pass to the cache's add method.
+
+    Returns:
+        The decorator function.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+
+            # generate key from args and kwargs
+            serialized_args = [arg for arg in args if isinstance(arg, (str, int, float))]
+            serialized_kwargs = {key: value for key, value in kwargs.items() if isinstance(value, (str, int, float))}
+
+            identifier = (func.__name__, tuple(serialized_args), frozenset(serialized_kwargs.items()))
+
+            if cache.has(identifier):
+                return cache.get(identifier, deserialize=True)
+
+            result = func(*args, **kwargs)
+            cache.add(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def cached_dependency(cache: Cache, dependency_func, *args_cache, **kwargs_cache):
     """
     Decorator that caches the result of a function or method call based on a specific dependency value.
 

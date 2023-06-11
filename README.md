@@ -13,8 +13,7 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 - Calculate the memory usage and usage percentage of the cache.
 
 ## WIP
-- Create argument-bound identifiers for caching using decorators
-- Create a more simple way to update cached data when using decorators
+- Create a more simple way to update cached data when using semi-manual decorators
 
 ## Dependencies
 
@@ -119,7 +118,13 @@ retrieved_data = cache.get("large_data_1")
 
 ### Decorators
 
-RattleCache provides decorators for easily caching the return values of functions and methods. The decorators handle the caching automatically and transparently and are the simple go-to method to use in big projects.
+RattleCache provides decorators for easily caching the return values of functions and methods. The decorators handle the caching automatically and transparently and are the 
+simple go-to method to use in big projects. 
+
+&nbsp;
+
+The semi-manual caching approach implemented in the `@cached()` decorator uses the mechanics of the Cache class to get access of using all Cache class methods 
+such as `Cache.get()` or `Cache.update()`. However, this method also needs to be handled manually when it comes to updating identifiers and their data.
 
 Python:
 ```python
@@ -129,14 +134,14 @@ from RattleCache import Cache, cache_result
 cache = Cache(memory_limit=4096, mode="LRU")
 
 # Apply the cache_function decorator to a function
-@cache_result(cache, "function_cache_key")
+@cached(cache, "function_cache_key")
 def expensive_function(arg1, arg2):
     # Perform expensive computation
     return result
 
 # Apply the cache_method decorator to a class method
 class MyClass:
-    @cache_result(cache, "method_cache_key")
+    @cached(cache, "method_cache_key")
     def expensive_method(self, arg1, arg2):
         # Perform expensive computation
         return result
@@ -146,6 +151,31 @@ expensive_result = expensive_function(arg1, arg2)
 
 # Since the function is called once, its result is cached and will be accessed if the function is called again
 cached_expensive_result = cache.get("function_cache_key")
+```
+
+If you want to cache the result of functions not based on predefined identifiers but using the function name as well as
+the arguments passed to the function, there is the `@cached_parameter()` decorator which fulfills this purpose. Keep in mind,
+that the cached data won't be retrievable/modifyable using identifier based Cache methods such as `Cache.update()` or `Cache.get()`.
+
+Python:
+```python
+
+# Create a cache instance with 4 GB and LRU mode and a serialize limit for 200 MB
+cache = Cache(memory_limit=4096, mode="LRU", serialize_limit=200)
+
+# Apply the cache_function decorator to a function
+@cached_parameter(cache)
+def expensive_function(arg1, arg2):
+    # Perform expensive computation
+    return result
+
+# The return values of the decorated function and method will be cached based on the function name and the arguments
+expensive_result_1 = expensive_function(1, "Hello")
+expensive_result_2 = expensive_function(42, "World!")
+
+# If you call one of these functions again with the same arguments, the cached result will 
+# be retrieved without calling the function again
+fast_call_for_result_2 = expensive_function(42, "World!")
 ```
 
 ## License
