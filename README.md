@@ -36,7 +36,7 @@ bash:
 The Cache class is the main component of RattleCache. Here's an basic overview of its attributes and methods for manual caching:
 
 Python:
-```
+```python
 from RattleCache import Cache
 
 # Create a cache instance
@@ -84,7 +84,7 @@ The cache instance can be configured with different eviction modes. These are fi
 - LFU (Least Frequently Used): Evicts the least frequently used entry when the memory limit is reached.
 
 Python:
-```
+```python
 # Create a cache instance with LRU eviction mode
 cache_lru = Cache(memory_limit=1024, mode="LRU")
 
@@ -100,7 +100,7 @@ cache_lfu = Cache(memory_limit=1024, mode="LFU")
 RattleCache supports automatic serialization of large data entries. You can set a serialize limit to specify the threshold size for serialization. By default, serialization is disabled. Deserialization is handled automatically.
 
 Python:
-```
+```python
 # Create a cache instance with serialization enabled
 cache = Cache(memory_limit= 4096, serialize_limit=200)
 
@@ -120,7 +120,7 @@ retrieved_data = cache.get("large_data_1")
 RattleCache provides decorators for easily caching the return values of functions and methods. The decorators handle the caching automatically and transparently and are the simple go-to method to use in big projects.
 
 Python:
-```
+```python
 from RattleCache import Cache, cache_result
 
 # Create a cache instance with 4 GB and LRU mode
