@@ -201,7 +201,7 @@ class Cache:
         # eviction if needed
         if self.__memory_limit is not None:
             data_size = self.__get_data_size(data)
-            while (sys.getsizeof(self.__cache) + data_size) > self.__memory_limit:
+            while (self.__get_data_size(self.__cache) + data_size) > self.__memory_limit:
                 self.__evict_entry()
         # serialization
         if self.__serialize_limit is not None and self.__get_data_size(data) > self.__serialize_limit:
@@ -354,26 +354,29 @@ def cached_args(cache, *args_cache, **kwargs_cache):
         The decorator function.
     """
     def decorator(func):
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # remove update statement befor generating identifier
+            update_cache = kwargs.pop('update_cache', False)
+
             # generate identifier from args and kwargs
             serialized_args = [arg for arg in args if isinstance(arg, (str, int, float))]
             serialized_kwargs = {key: value for key, value in kwargs.items() if isinstance(value, (str, int, float))}
             identifier = (func.__name__, tuple(serialized_args), frozenset(serialized_kwargs.items()))
 
-            # check from function call if cache should be updated
-            update_cache = kwargs.pop('update_cache', False)
+            # check from function call if cache should be updated or just get data
             if cache.has(identifier) and not update_cache:
-                return cache.get(identifier, deserialize=True)
+                return cache.get(identifier)
 
             # compute actual result
             result = func(*args, **kwargs)
 
             # add or update cache
             if not update_cache:
-                cache.add(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+                cache.add(identifier, result, *args_cache, **kwargs_cache)
             else:
-                cache.update(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+                cache.update(identifier, result, *args_cache, **kwargs_cache)
 
             return result
         return wrapper
