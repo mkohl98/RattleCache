@@ -12,9 +12,6 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 - Get an overview of all identifiers in the cache and their corresponding data size.
 - Calculate the memory usage and usage percentage of the cache.
 
-## WIP
-- Create a more simple way to update cached data when using semi-manual decorators
-
 ## Dependencies
 
 All dependencies are inbuild Python modules, icluding following:
@@ -30,7 +27,6 @@ All dependencies are inbuild Python modules, icluding following:
 
 To use RattleCache, you can clone the repository from GitHub:
 
-bash:
 `git clone https://github.com/mkohl98/RattleCache.git`
 
 ## Usage
@@ -38,9 +34,10 @@ bash:
 
 The Cache class is the main component of RattleCache. Here's an basic overview of its attributes and methods for manual caching:
 
-Python:
+
 ```python
 from RattleCache import Cache
+
 
 # Create a cache instance
 cache = Cache(memory_limit=1024, mode="LRU")
@@ -86,8 +83,11 @@ The cache instance can be configured with different eviction modes. These are fi
 - LRA (Least Recently Added): Evicts the least recently added entry when the memory limit is reached.
 - LFU (Least Frequently Used): Evicts the least frequently used entry when the memory limit is reached.
 
-Python:
+
 ```python
+from RattleCache import Cache
+
+
 # Create a cache instance with LRU eviction mode
 cache_lru = Cache(memory_limit=1024, mode="LRU")
 
@@ -102,8 +102,11 @@ cache_lfu = Cache(memory_limit=1024, mode="LFU")
 
 RattleCache supports automatic serialization of large data entries. You can set a serialize limit to specify the threshold size for serialization. By default, serialization is disabled. Deserialization is handled automatically.
 
-Python:
+
 ```python
+from RattleCache import Cache
+
+
 # Create a cache instance with serialization enabled
 cache = Cache(memory_limit= 4096, serialize_limit=200)
 
@@ -119,16 +122,17 @@ retrieved_data = cache.get("large_data_1")
 ### Decorators
 
 RattleCache provides decorators for easily caching the return values of functions and methods. The decorators handle the caching automatically and transparently and are the 
-simple go-to method to use in big projects. 
+simple go-to method to use in big projects. There are three different types of decorators for caching functions available to cover most use cases for caching data. All decorators
+can work with the same cache instance at the same time, so there is no restriction in using one type.
 
 &nbsp;
-
+#### cached() decorator function
 The semi-manual caching approach implemented in the `@cached()` decorator uses the mechanics of the Cache class to get access of using all Cache class methods 
-such as `Cache.get()` or `Cache.update()`. However, this method also needs to be handled manually when it comes to updating identifiers and their data.
+such as `Cache.get()` or `Cache.update()` manually.
 
-Python:
+
 ```python
-from RattleCache import Cache, cache_result
+from RattleCache import Cache, cached
 
 # Create a cache instance with 4 GB and LRU mode
 cache = Cache(memory_limit=4096, mode="LRU")
@@ -152,19 +156,21 @@ expensive_result = expensive_function(arg1, arg2)
 # Since the function is called once, its result is cached and will be accessed if the function is called again
 cached_expensive_result = cache.get("function_cache_key")
 ```
-
+#### cached_args() decorator function
 If you want to cache the result of functions not based on predefined identifiers but using the function name as well as
-the arguments passed to the function, there is the `@cached_parameter()` decorator which fulfills this purpose. Keep in mind,
+the arguments passed to the function, there is the `@cached_args()` decorator which fulfills this purpose. Keep in mind,
 that the cached data won't be retrievable/modifyable using identifier based Cache methods such as `Cache.update()` or `Cache.get()`.
 
-Python:
-```python
 
-# Create a cache instance with 4 GB and LRU mode and a serialize limit for 200 MB
-cache = Cache(memory_limit=4096, mode="LRU", serialize_limit=200)
+```python
+from RattleCache import Cache, cached_args
+
+
+# Create a cache instance with 4 GB and LRU mode and a serialize limit for 1 MB
+cache = Cache(memory_limit=4096, mode="LRU", serialize_limit=1)
 
 # Apply the cache_function decorator to a function
-@cached_parameter(cache)
+@cached_args(cache)
 def expensive_function(arg1, arg2):
     # Perform expensive computation
     return result
@@ -177,6 +183,42 @@ expensive_result_2 = expensive_function(42, "World!")
 # be retrieved without calling the function again
 fast_call_for_result_2 = expensive_function(42, "World!")
 ```
+
+#### updating decorator-cached data
+Now we come to the interesting part: updating cached data using decorator functions. Updating cached data using the class method is not possible for decorators such as `@cached_args()`. For this purpose 
+it is possible to decide if you want to update the cached data when calling the function directly. This method is available for all decorators.
+
+
+```python
+from RattleCache import Cache, cached_args
+
+
+# create a cache instance with 2 GB and LFU mode and a serialize limit for 1 MB
+cache = Cache(memory_limit=2048, mode="LFU", serialize_limit=1)
+
+# define function to cache by arguments
+@cached_args
+def my_expensive_function(arg1, arg2):
+    # Perform expensive computation
+    return result
+
+# function call to cache data
+arg_1 = "Hello"
+arg_2 = "World!"
+expensive_result = my_expensive_function(arg_1, arg_2)
+
+# it is now possible to retrieve the data as usual without the need to recompute
+get_result_again =  my_expensive_function(arg_1, arg_2)
+
+# if we now want to recompute the cached data but the arguments remain the same we typically
+# would not be able to update the data. This would also happen if a not-hashable object like a list
+# would be part of the arguments (and this could change quickly but all other args stay the same)
+# at this point we can simply call 'update_cache' (bool) key word in the function call even if the 
+# key word is not part of the function (it will also be ignored for idemtifier generation)
+updated_result = my_expensive_function(arg_1, arg_2, update_cache=True)
+
+```
+
 
 ## License
 This project underlies MIT-License.

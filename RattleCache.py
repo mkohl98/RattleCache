@@ -10,10 +10,11 @@ The Cache class provides methods for adding, retrieving, updating, and deleting 
 you to get an overview of all identifiers in the cache and their corresponding data size. Additionally, you can
 calculate the memory usage and usage percentage of the cache.
 
-The module includes two decorator functions: cache_result and cache_with_dependency. These decorators can be used to
-cache the results of function or method calls using the Cache instance. The cache_result decorator caches the result
-based on a unique identifier, while the cache_with_dependency decorator caches the result based on a
-specific dependency value.
+The module includes three decorator functions: cached and cached_args and cached_dependency. These decorators can be
+used to cache the results of function or method calls using the Cache instance. The cached decorator caches the result
+based on a unique identifier, while the cached_dependency decorator caches the result based on a
+specific dependency value. The cached_args decorator uses a combination of the function name and the provided arguments
+to generate an identifier to cache the returned data.
 """
 
 
@@ -295,7 +296,9 @@ class Cache:
 
 def cached(cache: Cache, identifier: str, *args_cache, **kwargs_cache):
     """
-    Decorator that caches the result of a function or method call using the provided cache.
+    Decorator that caches the result of a function or method call using the provided cache. Supports updating the
+    cached data on defined function calls based on the function arguments by providing an additional argument
+    'update_cache=True' in the function call.
 
     Args:
         cache (Cache): An instance of the Cache class to store the cached results.
@@ -312,21 +315,35 @@ def cached(cache: Cache, identifier: str, *args_cache, **kwargs_cache):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if cache.has(identifier):
+
+            # check if call causes update
+            update_cache = kwargs.pop('update_cache', False)
+
+            # get cached data if existing
+            if cache.has(identifier) and not update_cache:
                 return cache.get(identifier)
+
+            # compute data if not existing or updatable
             result = func(*args, **kwargs)
-            cache.add(identifier, result, *args_cache, **kwargs_cache)
+
+            # how to proceed with data
+            if not update_cache:
+                cache.add(identifier, result, *args_cache, **kwargs_cache)
+            if update_cache:
+                cache.update(identifier, result)  # Call the cache_update method
+
             return result
         return wrapper
     return decorator
 
 
-def cached_parameter(cache, *args_cache, **kwargs_cache):
+def cached_args(cache, *args_cache, **kwargs_cache):
     """
-    Decorator that caches the result of a function or method call using the provided cache. This function generate the
+    Decorator that caches the result of a function or method call using the provided cache. This function generates the
     identifier by itself using the provided arguments. This means its data is not accessible using Cache
-    methods which requires identifiers as arguments. This means this decorator is very niche but usefull if you don't
-    want to manage the cached data manually.
+    methods which require identifiers as arguments. This decorator is niche but useful if you don't want to
+    manage the cached data manually. Supports updating the cached data on defined function calls based on the function
+    arguments by providing an additional argument 'update_cache=True' in the function call.
 
     Args:
         cache (Cache): An instance of the Cache class to store the cached results.
@@ -339,28 +356,35 @@ def cached_parameter(cache, *args_cache, **kwargs_cache):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-
-            # generate key from args and kwargs
+            # generate identifier from args and kwargs
             serialized_args = [arg for arg in args if isinstance(arg, (str, int, float))]
             serialized_kwargs = {key: value for key, value in kwargs.items() if isinstance(value, (str, int, float))}
-
             identifier = (func.__name__, tuple(serialized_args), frozenset(serialized_kwargs.items()))
 
-            if cache.has(identifier):
+            # check from function call if cache should be updated
+            update_cache = kwargs.pop('update_cache', False)
+            if cache.has(identifier) and not update_cache:
                 return cache.get(identifier, deserialize=True)
 
+            # compute actual result
             result = func(*args, **kwargs)
-            cache.add(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+
+            # add or update cache
+            if not update_cache:
+                cache.add(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+            else:
+                cache.update(identifier, result, *args_cache, **kwargs_cache, serialize=True)
+
             return result
-
         return wrapper
-
     return decorator
 
 
 def cached_dependency(cache: Cache, dependency_func, *args_cache, **kwargs_cache):
     """
     Decorator that caches the result of a function or method call based on a specific dependency value.
+    Supports updating the cached data on defined function calls based on the function arguments by providing an
+    additional argument 'update_cache=True' in the function call.
 
     Args:
         cache (Cache): An instance of the Cache class to store the cached results.
@@ -377,12 +401,24 @@ def cached_dependency(cache: Cache, dependency_func, *args_cache, **kwargs_cache
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # compute identifier from dependency
             dependency_value = dependency_func(*args, **kwargs)
             identifier = f"{func.__name__}:{dependency_value}"
-            if cache.has(identifier):
+
+            # check if cache should be updated on call
+            update_cache = kwargs.pop('update_cache', False)
+            if cache.has(identifier) and not update_cache:
                 return cache.get(identifier)
+
+            # compute result of function
             result = func(*args, **kwargs)
-            cache.add(identifier, result, *args_cache, **kwargs_cache)
+
+            # add or update
+            if not update_cache:
+                cache.add(identifier, result, *args_cache, **kwargs_cache)
+            else:
+                cache.update(identifier, result, *args_cache, **kwargs_cache)
+
             return result
         return wrapper
     return decorator
