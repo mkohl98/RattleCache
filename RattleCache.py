@@ -144,8 +144,25 @@ class Cache:
         return self.get(identifier)
 
     def __setitem__(self, identifier: str, data):
-        # this does not update!!!
-        self.add(identifier, data)
+        # usual add call unless its tuple
+        if not isinstance(data, tuple):
+            self.add(identifier, data)
+            return
+        # also add tuple if second value is bool
+        if not isinstance(data[1], bool):
+            self.add(identifier, data)
+            return
+
+        # decide if bool is True or False for updating
+        data_cache, update_flag = data
+        if update_flag is False:
+            self.add(identifier, data)
+            return
+        else:
+            self.update(identifier, data)
+            return
+
+
 
     @staticmethod
     def __serialize_data(data):
@@ -192,12 +209,22 @@ class Cache:
         """ Checks if an identifier exists in the cache. """
         return identifier in self.__cache
 
-    def add(self, identifier: str, data, serialize: bool = False):
+    def add(self, identifier: str, data, serialize: bool = False, update: bool = False):
         """
         Adds an entry to the cache.
         Bracket notation is also available: **my_cache_instance[identifier] = data** (This uses serialization only if
         serialization_limit is set.)
+
+        arguments:
+            identifier (str, hashable items): identifier key in cache
+            data (any): data to cache
+            serialize (bool): optional, if True serialize for memory efficiency
+            update (bool): optional, if True the add will trigger updating the cache by the identifier
         """
+        # check if update is True and kill existing entry for the identifier
+        if update is True:
+            self.delete(identifier=identifier)
+
         # eviction if needed
         if self.__memory_limit is not None:
             data_size = self.__get_data_size(data)
@@ -237,6 +264,10 @@ class Cache:
         """ Update data in cache, cached by identifier. """
         self.delete(identifier)
         self.add(identifier, data, serialize=serialize)
+
+    def kw(self, update: bool = False, serialize: bool = False):
+        """interesting function to use when using bracket notation to set additional keywords from Cache.add method"""
+        return __PrivateUtils.CacheAddKeywordProxy
 
     def delete(self, identifier: str):
         """ Deletes an entry from the cache. """
@@ -290,6 +321,33 @@ class Cache:
     def identifiers(self) -> list:
         """ Returns a list with all identifiers. """
         return list(self.__cache.keys())
+
+
+class __PrivateUtils:
+    class CacheAddKeywordProxy:
+        """
+        Class to provide a proxy item for alternative bracket notation cache setting updates. might be useful.
+        Allows following behavior:
+
+        my_cache.kw(True)["identifier_1"] = "updated_value"
+        my_cache.kw(update=True)["identifier_1"] = "updated_value_again"
+        my_cache.kw(update=True, True)["identifier_1"] = "updated_value_serialized"
+
+        """
+
+        def __init__(self, cache: Cache, identifier, *args, **kwargs):
+            self.cache = cache
+            self.identifier = identifier
+            self.args = args
+            self.kwargs = kwargs
+
+        def __setitem__(self, identifier, data):
+            if self.identifier != identifier:
+                raise ValueError("Identifier mismatch. Use this function only together with the bracket "
+                                 "assignment notation.")
+
+            # might be the magic, if not parse each arg out of args and kwargs
+            self.cache.add(identifier, data, *self.args, **self.kwargs)
 
 
 ### Decorator Functions

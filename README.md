@@ -13,8 +13,8 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 - Calculate the memory usage and usage percentage of the cache.
 
 ## Dependencies
-
-All dependencies are inbuild Python modules, icluding following:
+To run RattleCache you will need to have Python 3.9 installed.
+All dependencies are built-in Python modules, including following:
 
 - **collections.OrderedDict**: Used for maintaining the cache entries in insertion order.
 - **collections.defaultdict**: Used for tracking the frequency of cache entries in LFU mode.
