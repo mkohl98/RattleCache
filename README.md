@@ -5,10 +5,12 @@ RattleCache is a Python module that provides a Cache class for creating cache in
 
 ## Features
 - Create cache instances with different eviction modes: LRU, LRA, and LFU.
-- Set a memory limit for the cache.
+- Thread-Safe Implementation.
+- 3 different decorator functions for caching data in the same cache using different handy identification mechanisms.
+- Set a memory limit for the cache and all instances of caches.
 - Serialize large data entries automatically.
 - Efficient eviction of entries when the memory limit is reached.
-- Add, retrieve, update, and delete entries from the cache.
+- Add, retrieve, update, and delete entries from the cache using pythonic style.
 - Get an overview of all identifiers in the cache and their corresponding data size.
 - Calculate the memory usage and usage percentage of the cache.
 

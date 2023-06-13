@@ -25,12 +25,15 @@ import pickle
 import sys
 import functools
 import heapq
+import threading
 
 
 ### Constants
 
 MAX_SHARED_CACHE_MEMORY: int = None
 """int, Constant to set if you want to set a maximum shared memory [megabyte] of all Cache class instances."""
+_SHARED_CASHES: list = []
+"""list, protected constant, stores all instances of Cache class"""
 
 
 ### Main Class
@@ -79,11 +82,6 @@ class Cache:
         identifiers() -> list:
             Returns a list with all identifiers.
     """
-
-    # class variables
-    __max_shared_memory_limit = MAX_SHARED_CACHE_MEMORY   # retrieve constant
-    __shared_caches = []   # store references to all cache instances
-
     def __init__(self,
                  memory_limit: int,
                  mode: str = "LRU",
@@ -99,6 +97,7 @@ class Cache:
         self.__eviction_percentage = eviction_percentage
         self.__serialize_limit = serialize_limit
         self.__cache = OrderedDict()
+        self.__lock = threading.Lock()
 
         # LFU mode only data
         if self.__mode == "LFU":
@@ -106,14 +105,14 @@ class Cache:
             self.__frequency_heap = []  # Heap to keep track of entries based on their frequency
 
         # show that you exceed max_memory_shared
-        self.__shared_caches.append(self)
-        if self.__max_shared_memory_limit is not None:
-            if type(self.__max_shared_memory_limit) != int:
+        _SHARED_CASHES.append(self)
+        if MAX_SHARED_CACHE_MEMORY is not None:
+            if type(MAX_SHARED_CACHE_MEMORY) != int:
                 raise TypeError("MAX_SHARED_CACHE_MEMORY has to be either None or int.")
             check_sum = 0
-            for cache in self.__shared_caches:
+            for cache in _SHARED_CASHES:
                 check_sum += cache.memory_limit
-            if check_sum > self.__max_shared_memory_limit:
+            if check_sum > MAX_SHARED_CACHE_MEMORY:
                 print("\x1b[31;20mCacheWarning: "
                       "Most recent initialized instance of Cache class exceeds your set MAX_SHARED_CACHE_MEMORY.\n"
                       "This Cache instance will be deleted. "
@@ -159,19 +158,20 @@ class Cache:
 
     def __evict_entry(self):
         """  Evicts the least recently used entry from the cache. """
-        if self.__mode == "LRA":
-            key = self.__get_least_key()
-            del self.__cache[key]
-        elif self.__mode == "LRU":
-            key = self.__get_least_key()
-            del self.__cache[key]
-        elif self.__mode == "LFU":
-            # Evict the least frequently used entry
-            while self.__frequency_heap:
-                frequency, key = heapq.heappop(self.__frequency_heap)
-                if key in self.__cache:
-                    del self.__cache[key]
-                    break
+        with self.__lock:
+            if self.__mode == "LRA":
+                key = self.__get_least_key()
+                del self.__cache[key]
+            elif self.__mode == "LRU":
+                key = self.__get_least_key()
+                del self.__cache[key]
+            elif self.__mode == "LFU":
+                # Evict the least frequently used entry
+                while self.__frequency_heap:
+                    frequency, key = heapq.heappop(self.__frequency_heap)
+                    if key in self.__cache:
+                        del self.__cache[key]
+                        break
 
     def __get_least_key(self) -> str:
         """ Returns the least recently used key in the cache without need to create iter but just view. """
@@ -185,24 +185,34 @@ class Cache:
     def __update_frequency(self, identifier):
         """ Increase frequency of item by identifier"""
         if self.__mode == "LFU":
-            self.__frequency[identifier] += 1
+            with self.__lock:
+                self.__frequency[identifier] += 1
 
     # public methods
     def has(self, identifier: str) -> bool:
         """ Checks if an identifier exists in the cache. """
-        return identifier in self.__cache
+        with self.__lock:
+            return identifier in self.__cache
 
-    def add(self, identifier: str, data, serialize: bool = False):
+    def add(self, identifier: str, data, serialize: bool = False, update: bool = False):
         """
         Adds an entry to the cache.
         Bracket notation is also available: **my_cache_instance[identifier] = data** (This uses serialization only if
         serialization_limit is set.)
         """
+        # skip if already existing
+        with self.__lock:
+            if identifier in self.__cache:
+                if update:
+                    self.update(identifier, data, serialize=serialize)
+                return
+
         # eviction if needed
         if self.__memory_limit is not None:
             data_size = self.__get_data_size(data)
-            while (self.__get_data_size(self.__cache) + data_size) > self.__memory_limit:
-                self.__evict_entry()
+            with self.__lock:
+                while (self.__get_data_size(self.__cache) + data_size) > self.__memory_limit:
+                    self.__evict_entry()
         # serialization
         if self.__serialize_limit is not None and self.__get_data_size(data) > self.__serialize_limit:
             serialize = True
@@ -210,38 +220,41 @@ class Cache:
             data = self.__serialize_data(data)
         # mode specifics
         if self.__mode == "LFU":
-            self.__update_frequency(identifier)
+            self.__update_frequency(identifier)  # already thread locked
         # set data
-        self.__cache[identifier] = data
+        with self.__lock:
+            self.__cache[identifier] = data
 
     def get(self, identifier: str):
         """
         Retrieves an entry from the cache.
         Bracket notation is also available: **data = my_cache_instance[identifier]**.
         """
-        if identifier not in self.__cache:
-            return None
-        data = self.__cache[identifier]
+        with self.__lock:
+            if identifier not in self.__cache:
+                return None
+            data = self.__cache[identifier]
+
+            # eviction mode management
+            if self.__mode == "LRU":
+                self.__cache.move_to_end(identifier)
+            if self.__mode == "LFU":
+                self.__update_frequency(identifier)
+
         if isinstance(data, bytes):
             return pickle.loads(data)
-
-        # eviction mode
-        if self.__mode == "LRU":
-            self.__cache.move_to_end(identifier)
-        if self.__mode == "LFU":
-            self.__update_frequency(identifier)
-
         return data
 
     def update(self, identifier: str, data, serialize: bool = False):
         """ Update data in cache, cached by identifier. """
-        self.delete(identifier)
-        self.add(identifier, data, serialize=serialize)
+        self.delete(identifier)  # already thread-save
+        self.add(identifier, data, serialize=serialize)  # already thread-safe
 
     def delete(self, identifier: str):
         """ Deletes an entry from the cache. """
-        if identifier in self.__cache:
-            del self.__cache[identifier]
+        with self.__lock:
+            if identifier in self.__cache:
+                del self.__cache[identifier]
 
     def clear_cache(self) -> None:
         """ Clears cache. """
@@ -289,7 +302,8 @@ class Cache:
 
     def identifiers(self) -> list:
         """ Returns a list with all identifiers. """
-        return list(self.__cache.keys())
+        with self.__lock:
+            return list(self.__cache.keys())
 
 
 ### Decorator Functions
